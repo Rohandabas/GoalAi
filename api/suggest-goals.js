@@ -29,19 +29,28 @@ export default async function handler(req, res) {
     const model = genAI.getGenerativeModel({
       model: 'gemini-1.5-flash',
       generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 2048,
+        temperature: 0.1,  // Lower temperature for more deterministic output
+        topK: 1,          // Limit to top 1 token for stricter output
+        topP: 0.1,        // Lower probability for stricter output
+        maxOutputTokens: 512, // Reduce to ensure concise JSON
       },
     });
 
     console.log('Generating content with prompt:', prompt);
-    const promptText = `Suggest 3 concise, actionable, and specific goals based on this prompt: "${prompt}". Output as a JSON array of strings, e.g., ["Goal 1", "Goal 2", "Goal 3"]`;
+    const promptText = 'Suggest 3 concise, actionable, and specific goals based on this prompt: "' + prompt + '". Output ONLY a raw JSON array of strings, e.g., ["Goal 1", "Goal 2", "Goal 3"], without any additional formatting, markdown, or text. Do not include ```json or any other wrappers.';
     const result = await model.generateContent(promptText);
-    console.log('Gemini response:', result.response.text());
+    console.log('Raw Gemini response:', result.response.text());
 
-    const suggestions = JSON.parse(result.response.text().trim()) || ['Complete a small task today', 'Take a 10-minute walk', 'Plan tomorrow’s goals'];
+    // Clean the response to remove any potential Markdown or extra whitespace
+    let cleanedResponse = result.response.text().trim();
+    if (cleanedResponse.startsWith('```json') && cleanedResponse.endsWith('```')) {
+      cleanedResponse = cleanedResponse.slice(7, -3).trim(); // Remove ```json and ```
+    }
+    // Remove any other common Markdown or text wrappers
+    cleanedResponse = cleanedResponse.replace(/^\s*\/\/.*$/gm, '').replace(/^\s*\/\*.*?\*\//gs, '').trim();
+
+    console.log('Cleaned Gemini response:', cleanedResponse);
+    const suggestions = JSON.parse(cleanedResponse) || ['Complete a small task today', 'Take a 10-minute walk', 'Plan tomorrow’s goals'];
     res.status(200).json({ suggestions });
   } catch (error) {
     console.error('Error in suggest-goals:', error.message, error.stack);

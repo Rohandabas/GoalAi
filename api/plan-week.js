@@ -29,19 +29,28 @@ export default async function handler(req, res) {
     const model = genAI.getGenerativeModel({
       model: 'gemini-1.5-flash',
       generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 2048,
+        temperature: 0.1,  // Lower temperature for more deterministic output
+        topK: 1,          // Limit to top 1 token for stricter output
+        topP: 0.1,        // Lower probability for stricter output
+        maxOutputTokens: 512, // Reduce to ensure concise JSON
       },
     });
 
     console.log('Generating content with summary:', summary);
-    const promptText = `Create a weekly schedule based on this summary: "${summary}". Output as a JSON object with days (Monday to Saturday) as keys and arrays of goal objects (e.g., { text: "Goal", category: "Category" }), e.g., { "Monday": [{ text: "Exercise", category: "Health" }] }`;
+    const promptText = 'Create a weekly schedule based on this summary: "' + summary + '". Output ONLY a raw JSON object with days (Monday to Saturday) as keys and arrays of goal objects (e.g., { text: "Goal", category: "Category" }), e.g., { "Monday": [{ text: "Exercise", category: "Health" }] }, without any additional formatting, markdown, or text. Do not include ```json or any other wrappers.';
     const result = await model.generateContent(promptText);
-    console.log('Gemini response:', result.response.text());
+    console.log('Raw Gemini response:', result.response.text());
 
-    const weeklyPlan = JSON.parse(result.response.text().trim()) || {
+    // Clean the response to remove any potential Markdown or extra whitespace
+    let cleanedResponse = result.response.text().trim();
+    if (cleanedResponse.startsWith('```json') && cleanedResponse.endsWith('```')) {
+      cleanedResponse = cleanedResponse.slice(7, -3).trim(); // Remove ```json and ```
+    }
+    // Remove any other common Markdown or text wrappers
+    cleanedResponse = cleanedResponse.replace(/^\s*\/\/.*$/gm, '').replace(/^\s*\/\*.*?\*\//gs, '').trim();
+
+    console.log('Cleaned Gemini response:', cleanedResponse);
+    const weeklyPlan = JSON.parse(cleanedResponse) || {
       Monday: [{ text: 'Exercise 20 min', category: 'Health' }],
       Tuesday: [{ text: 'Work 1 hour', category: 'Work' }],
       Wednesday: [{ text: 'Study notes', category: 'Learning' }],
