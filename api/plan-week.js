@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
   try {
     if (!process.env.GEMINI_KEY) {
-      throw new Error('GEMINI_KEY environment variable is missing');
+      throw new Error('GEMINI_Key environment variable is missing');
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
